@@ -11,26 +11,97 @@ import XCTest
 
 class MVVMTests: XCTestCase {
     
+
+    var sut: RepoTableViewModel!
+    var mockAPIService: MockApiService!
+    
     override func setUp() {
         super.setUp()
-        // Put setup code here. This method is called before the invocation of each test method in the class.
+        mockAPIService = MockApiService()
+        sut = RepoTableViewModel(apiService: mockAPIService)
     }
     
     override func tearDown() {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
+        sut = nil
+        mockAPIService = nil
         super.tearDown()
     }
     
-    func testExample() {
-        // This is an example of a functional test case.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-    }
     
-    func testPerformanceExample() {
-        // This is an example of a performance test case.
-        self.measure {
-            // Put the code you want to measure the time of here.
+    
+    func test_create_cell_view_model() {
+        // Given
+        let repos = StubGenerator().stubPhotos()
+        mockAPIService.completeRepos = repos
+        let expect = XCTestExpectation(description: "reload closure triggered")
+        sut.reloadTableViewClosure = { () in
+            expect.fulfill()
         }
+        
+        // When
+        sut.initFetch()
+        mockAPIService.fetchSuccess()
+        
+        // Number of cell view model is equal to the number of photos
+        XCTAssertEqual( sut.numberOfCells, repos.count )
+        XCTAssertEqual(sut.numberOfCells, 1)
+        
+        // XCTAssert reload closure triggered
+        wait(for: [expect], timeout: 1.0)
+        
     }
     
+    
+    func test_cell_view_model() {
+        let repo = Repo(name: "MVVM", url: "www.mvvm.com", desc: "MVVM", starCount: 0, forkCount: 0)
+        let repoWithStar100 = Repo(name: "MVVM", url: "www.mvvm.com", desc: "MVVM", starCount: 100, forkCount: 0)
+        let repoWithoutDesc = Repo(name: "MVVM", url: "www.mvvm.com", desc: "", starCount: 0, forkCount: 0)
+        
+        
+        let cellViewModel = sut!.createCellViewModel( repo:repo )
+        let cellViewModelWithStar100 = sut!.createCellViewModel( repo: repoWithStar100 )
+        let cellViewModelWithoutDesc = sut!.createCellViewModel( repo: repoWithoutDesc )
+        
+        XCTAssertEqual( repo.name, cellViewModel.name )
+        XCTAssertEqual( repo.url, cellViewModel.url )
+        
+        XCTAssertEqual(cellViewModel.name, "\(repo.name)" )
+        XCTAssertEqual(cellViewModelWithoutDesc.desc!, repoWithoutDesc.desc! )
+        XCTAssertEqual(cellViewModelWithStar100.starCount, 100)
+        
+        
+    }
+    
+}
+
+class MockApiService: ApiService {
+    
+    var isFetchRepoCalled = false
+    
+    var completeRepos: [Repo] = [Repo]()
+    var completeClosure: ((Int, [Repo], String) -> ())!
+    
+    override
+    func fetchAllRepo(onResult: @escaping (Int, [Repo], String) -> ()) {
+        isFetchRepoCalled = true
+        completeClosure = onResult
+        
+    }
+    
+    func fetchSuccess() {
+        completeClosure( 0, completeRepos, "" )
+    }
+    
+    func fetchFail(error:String) {
+        completeClosure( 0, completeRepos, error )
+    }
+    
+}
+
+class StubGenerator {
+    func stubPhotos() -> [Repo] {
+        var repos:[Repo] = []
+        repos.append(Repo(name: "MVVM", url: "www.mvvm.com", desc: "MVVM", starCount: 0, forkCount: 0))
+        return repos
+    }
 }
